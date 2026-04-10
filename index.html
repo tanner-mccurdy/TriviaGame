@@ -30,6 +30,97 @@
 
   <script>
 
+    (function () {
+      const STORAGE_KEY = 'triviaQuestions';
+      const ANSWER_KEY = 'currentAnswer';
+      const API_URL = 'https://opentdb.com/api.php?amount=10&type=boolean';
+
+      function decodeHtmlEntities(str) {
+        return $('<div/>').html(str).text();
+      }
+
+      async function fetchAndStoreQuestions() {
+        try {
+          const res = await axios.get(API_URL);
+          const items = res.data && res.data.results ? res.data.results : [];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+          return items;
+        } catch (err) {
+          console.error('Failed to fetch questions', err);
+          return [];
+        }
+      }
+
+      async function getStoredQuestions() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch (e) {
+          console.error('Invalid JSON in localStorage, clearing key');
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+      }
+
+      async function loadQuestion() {
+        let questions = await getStoredQuestions();
+        if (!questions || !Array.isArray(questions) || questions.length === 0) {
+          questions = await fetchAndStoreQuestions();
+        }
+
+        if (!questions || questions.length === 0) {
+          $('#question').text('No questions available. Reload the page.');
+          sessionStorage.removeItem(ANSWER_KEY);
+          return;
+        }
+
+        // Removes one question from the front
+        const q = questions.shift();
+
+        // Saves remaining questions back or remove key when empty
+        if (questions.length > 0) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+
+        // Stores correct answer in sessionStorage
+        sessionStorage.setItem(ANSWER_KEY, q.correct_answer);
+
+        // Displays decoded question text
+        $('#question').text(decodeHtmlEntities(q.question));
+      }
+
+      // Button handlers
+      $('#trueBtn').on('click', function () {
+        const correct = sessionStorage.getItem(ANSWER_KEY);
+        if (!correct) return alert('No active question.');
+        if (correct === 'True') {
+          alert('Correct!');
+          loadQuestion();
+        } else {
+          alert('Try again');
+        }
+      });
+
+      $('#falseBtn').on('click', function () {
+        const correct = sessionStorage.getItem(ANSWER_KEY);
+        if (!correct) return alert('No active question.');
+        if (correct === 'False') {
+          alert('Correct!');
+          loadQuestion();
+        } else {
+          alert('Try again');
+        }
+      });
+
+      // Loads initial question on page ready
+      $(document).ready(function () {
+        loadQuestion();
+      });
+    })();
+
   </script>
 </body>
 </html>
